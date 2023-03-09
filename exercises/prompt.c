@@ -13,8 +13,7 @@ char **parse(char *buffer);
 void freeparse(char **parsed);
 void print_args(char **args);
 
-int main(int argc, char **argv) {
-    
+int main(int argc, char **argv) {    
     // Constants
     const char *PROMPT = "% "; // Define prompt
     char *BUFFER = (char *)malloc(MAX_LENGTH * sizeof(char)); // buffer temporarily stores user's input
@@ -30,19 +29,38 @@ int main(int argc, char **argv) {
     return 0;
 }
 
+// internal commands
 void understand(char *input) {
-    if (strcmp(input, "moo\n") == 0) {
-        fputs("Moo to you too!\n", stdout);
+    char **args = parse(input);
+    if (*args != NULL) {
+        if (strcmp(*args, "clr") == 0) {
+            system("clear");
+        } else if (strcmp(*args, "quit") == 0) {
+            exit(0);
+        } else if (strcmp(*args, "moo") == 0) {
+            fputs("moo to you too!\n", stdout);
+        } else if (strcmp(*args, "environ") == 0) {
+            whatisenviron();
+        } else if (strcmp(*args, "arglist") == 0) {
+            print_args(args);
+        } else if (strcmp(*args, "dir") == 0) {
+            if (*(args + 1) != NULL) {
+                int cmdlen = strlen("ls -al ") + strlen(*(args + 1)) + 1;
+                char *command = (char*)malloc(cmdlen * sizeof(char));
+                strcpy(command, "ls -al ");
+                strcat(command, *(args + 1));
+                *(command + cmdlen) = '\0';
+                system(command);
+                free(command);
+                // show the specific directory
+            } else {
+                system("ls -al");
+            }
+        } else {
+            system(*args);
+        }
     }
-    if (strcmp(input, "environ\n") == 0) {
-        whatisenviron();
-    }
-    if (strncmp(input, "parsetest", 9) == 0) {
-        //printf("not implemented yet");
-        char **args = parse(input);
-        print_args(args);
-        freeparse(args);
-    }
+    freeparse(args);
     return;
 }
 
