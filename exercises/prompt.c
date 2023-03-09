@@ -11,6 +11,7 @@ void understand(char *input);
 void whatisenviron();
 char **parse(char *buffer);
 void freeparse(char **parsed);
+void print_args(char **args);
 
 int main(int argc, char **argv) {
     
@@ -39,6 +40,7 @@ void understand(char *input) {
     if (strncmp(input, "parsetest", 9) == 0) {
         //printf("not implemented yet");
         char **args = parse(input);
+        print_args(args);
         freeparse(args);
     }
     return;
@@ -89,10 +91,21 @@ void freeparse(char **parsed) {
     int counter = 0;
     while(*(parsed + counter) != NULL) {
         free(*(parsed + counter));
-        printf("cleared mem %i\n", counter);
+        //printf("cleared mem %i\n", counter);
         counter++;
     }
     free(parsed);
+    return;
+}
+
+void print_args(char **args) {
+    fputs("====== args ======\n", stdout);
+    int counter = 0;
+    while (*(args + counter) != NULL) {
+        fputs(*(args + counter), stdout);
+        fputs("\n", stdout);
+        counter++;
+    }
     return;
 }
 
