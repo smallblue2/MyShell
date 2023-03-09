@@ -9,16 +9,17 @@ extern char **environ;
 
 void understand(char *input);
 void whatisenviron();
-char **parse(char *BUFFER);
-void clearparse(char **freeme);
-void printstrlist(char **list);
+char **parse(char *buffer);
+void freeparse(char **parsed);
 
 int main(int argc, char **argv) {
     
     // Constants
     const char *PROMPT = "% "; // Define prompt
     char *BUFFER = (char *)malloc(MAX_LENGTH * sizeof(char)); // buffer temporarily stores user's input
-
+    if (!BUFFER) {
+        fputs("Failed to allocate buffer memory!", stdout);
+    }
     while(!feof(stdin)) { // Keep running as long as you're not at the end of file
         fputs(PROMPT, stdout); // Print prompt
         fgets(BUFFER, MAX_LENGTH, stdin); // Get input
@@ -36,9 +37,9 @@ void understand(char *input) {
         whatisenviron();
     }
     if (strncmp(input, "parsetest", 9) == 0) {
-        char **test = parse(input);
-        printstrlist(test);
-        clearparse(test);
+        //printf("not implemented yet");
+        char **args = parse(input);
+        freeparse(args);
     }
     return;
 }
@@ -60,50 +61,99 @@ void whatisenviron() {
     return;
 }
 
-// Returns a string array of all arguments.
-char **parse(char *BUFFER) {
-    char **args = (char**)malloc(MAX_ARGS * sizeof(char*)); // up to 50 args accepted
-    for (int i = 0; i < MAX_ARGS; ++i) {
-        *(args + i) = (char*)malloc(MAX_ARG_LEN * sizeof(char));
+char **parse(char *buffer) {
+    char **args = (char **)malloc(MAX_ARGS * sizeof(char *));
+    if (!args) {
+        printf("FAILED: memory assigned to args");
+        return NULL;
     }
     
-    char *tmpbuffer = (char*)malloc(strlen(BUFFER) + 1);
-    strcpy(tmpbuffer, BUFFER);
-
-    char *tmp = strtok(tmpbuffer, " ");
-
-    int counter = 0;
-    while (tmp != NULL) {
-        strcpy(*(args + counter), tmp);
-        counter++;
-        tmp = strtok(NULL, " ");
+    char *arg = strtok(buffer, " \n");
+    int arg_count = 0;
+    while (arg != NULL && arg_count < MAX_ARGS) {
+        *(args + arg_count) = (char*)malloc(strlen(arg) + 1);
+        if (*(args + arg_count) == NULL) {
+            fprintf(stderr, "FAILED: memory assigned to args");
+            exit(1);
+        }
+        strcpy(*(args + arg_count), arg);
+        arg_count++;
+        arg = strtok(NULL, " \n");
     }
+    *(args + arg_count) = NULL;
 
-    free(tmpbuffer);
     return args;
 }
 
-void clearparse(char **freeme) {
-    for(int i = 0; i < MAX_ARGS; ++i) {
-        free(*(freeme + i));
+void freeparse(char **parsed) {
+    int counter = 0;
+    while(*(parsed + counter) != NULL) {
+        free(*(parsed + counter));
+        printf("cleared mem %i\n", counter);
+        counter++;
     }
-    free(freeme);
+    free(parsed);
     return;
 }
 
-void printstrlist(char **list) {
-    int i = 0;
-    while(strlen(*(list + i)) != 0) {
-        fputs(*(list + i), stdout);
-        fputs("\n", stdout);
-        i++;
-    }
-    return;
-}
 
-void arg_length() {
-}
-
-void dir() {
-    
-}
+// Returns a string array of all arguments.
+//char **parse(char *BUFFER) {
+//    char **args = (char**)malloc((MAX_ARGS + 1) * sizeof(char*)); // up to 50 args accepted + 1 for NULL
+//    if (!args) {
+//        fputs("Failed to allocate memory for arg array", stdout);
+//        return NULL; // Error handling here?
+//    }
+//    for (int i = 0; i < MAX_ARGS + 1; ++i) { // Setting 50 args + 1 for NULL
+//        *(args + i) = (char*)malloc(MAX_ARG_LEN * sizeof(char));
+//        if (!*(args + i)) {
+//            fputs("Failed to allocate memory for individual arg", stdout);
+//            return NULL; // Error handling here?
+//        }
+//    }
+//    *(args + MAX_ARGS) = NULL;
+//    
+//    //char *tmpbuffer = (char*)malloc(strlen(BUFFER) + 1);
+//    //strcpy(tmpbuffer, BUFFER);
+//
+//    char *tmp = strtok(BUFFER, " ");
+//
+//    int counter = 0;
+//    while (tmp != NULL) {
+//        strcpy(*(args + counter), tmp);
+//        counter++;
+//        tmp = strtok(NULL, " ");
+//    }
+//
+//    return args;
+//}
+//
+//void clearparse(char **freeme) {
+//    for(int i = 0; i < MAX_ARGS + 1; ++i) {
+//        free(*(freeme + i));
+//    }
+//    free(freeme);
+//    return;
+//}
+//
+//void printstrlist(char **list) {
+//    int i = 0;
+//    while(strlen(*(list + i)) != 0) {
+//        fputs(*(list + i), stdout);
+//        fputs("\n", stdout);
+//        i++;
+//    }
+//    return;
+//}
+//
+//int args_length(char **args) {
+//    int counter = 0;
+//    while (strlen(*(args + counter)) != 0) {
+//        counter++;
+//    }
+//    return counter;
+//}
+//
+//void dir() {
+//    
+//}
