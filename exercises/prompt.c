@@ -3,6 +3,7 @@
 #include<string.h>
 #include<unistd.h>
 #include<sys/types.h>
+#include<sys/wait.h>
 #include<dirent.h>
 #include<errno.h>
 
@@ -43,7 +44,17 @@ void understand(char *input, char *cwd) {
     char **args = parse(input);
     if (*args != NULL) {
         if (strcmp(*args, "clr") == 0) {
-            system("clear");
+            pid_t pid;
+            switch(pid = fork()) {
+            case -1:
+                printf("Uh oh, something went wrong!");
+            case 0:
+                execlp("clear", "clear", NULL);
+                printf("Uh oh, something went wrong!");
+            default:
+                int status;
+                wait(&status);
+            }
         } else if (strcmp(*args, "quit") == 0) {
             exit(0);
         } else if (strcmp(*args, "moo") == 0) {
@@ -106,7 +117,17 @@ void understand(char *input, char *cwd) {
                 system("ls -al");
             }
         } else {
-            system(*args);
+            pid_t pid;
+            switch(pid = fork()) {
+            case -1:
+                printf("uh oh\n");
+            case 0:
+                execvp(*args, args);
+                printf("uh oh no\n");
+            default:
+                int status;
+                wait(&status);
+            }
         }
     }
     freeparse(args);
