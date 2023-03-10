@@ -1,0 +1,8 @@
+===== Notes for implementing proper shell =====
+
+for CWD pointer;
+avoid it, use getenv("PWD") instead.
+
+In cd function;
+check for absolute before relative, fixes behaviour of 'cd /' and avoids computing 'relpathname'.
+for setting PWD with relative, be smart about '.' and '..', or else it'll keep adding and adding to infinitely long relpathname

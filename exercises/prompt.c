@@ -1,13 +1,18 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
+#include<unistd.h>
+#include<sys/types.h>
+#include<dirent.h>
+#include<errno.h>
 
 #define MAX_LENGTH 100
 #define MAX_ARGS 50
 #define MAX_ARG_LEN 20
+#define MAX_PATH 260
 extern char **environ;
 
-void understand(char *input);
+void understand(char *input, char *cwd);
 void whatisenviron();
 char **parse(char *buffer);
 void freeparse(char **parsed);
@@ -15,22 +20,26 @@ void print_args(char **args);
 
 int main(int argc, char **argv) {    
     // Constants
-    const char *PROMPT = "% "; // Define prompt
+    const char *PROMPT = "%> "; // Define prompt
+    char* CWD = (char*)malloc(MAX_PATH * sizeof(char)); // setup cwd
     char *BUFFER = (char *)malloc(MAX_LENGTH * sizeof(char)); // buffer temporarily stores user's input
     if (!BUFFER) {
         fputs("Failed to allocate buffer memory!", stdout);
     }
     while(!feof(stdin)) { // Keep running as long as you're not at the end of file
+        getcwd(CWD, MAX_PATH);
+        fputs(CWD, stdout);
         fputs(PROMPT, stdout); // Print prompt
         fgets(BUFFER, MAX_LENGTH, stdin); // Get input
-        understand(BUFFER);
+        understand(BUFFER, CWD);
     }
+    free(CWD);
     free(BUFFER);
     return 0;
 }
 
 // internal commands
-void understand(char *input) {
+void understand(char *input, char *cwd) {
     char **args = parse(input);
     if (*args != NULL) {
         if (strcmp(*args, "clr") == 0) {
@@ -43,6 +52,46 @@ void understand(char *input) {
             whatisenviron();
         } else if (strcmp(*args, "arglist") == 0) {
             print_args(args);
+        } else if (strcmp(*args, "pwd") == 0) { // pwd implementation
+            fputs(cwd, stdout);
+            fputs("\n", stdout);
+        } else if (strcmp(*args, "cd") == 0) { // cd implementation
+            if (*(args + 1) != NULL) {
+                char *relpathname = (char*)malloc(MAX_PATH * sizeof(char));
+                if (relpathname == NULL) {
+                    fputs("Failed to assign memory for cd operation!", stdout);
+                    freeparse(args);
+                    return;
+                }   
+                // sets relpathname
+                strcpy(relpathname, cwd);
+                strcat(relpathname, "/");
+                strcat(relpathname, *(args + 1));
+
+                DIR* dir = opendir(relpathname); // check to see if it exists (relative path);
+                if (dir) { // it's a relative path
+                    chdir(relpathname);
+                    setenv("PWD", relpathname, 1);
+                } else if (ENOENT == errno) { // Directory doesn't exist!
+                    // check absolute path
+                    dir = opendir(*(args + 1));
+                    if (dir) {
+                        // it's an absolute path
+                        chdir(*(args + 1));
+                        setenv("PWD", *(args + 1), 1);
+                    } else if (ENOENT == errno) {
+                        fputs("Directory doesn't exist!\n", stdout);
+                    }
+                } else if (EACCES == errno) { // It's not a directory at all!
+                    fputs("Permission denied!\n", stdout);
+                } else { // Something's gone wrong!
+                    fputs("Operation failed\n", stdout);
+                }
+                closedir(dir);
+                free(relpathname);
+            } else {
+                chdir(getenv("HOME"));
+            }
         } else if (strcmp(*args, "dir") == 0) {
             if (*(args + 1) != NULL) {
                 int cmdlen = strlen("ls -al ") + strlen(*(args + 1)) + 1;
@@ -126,65 +175,3 @@ void print_args(char **args) {
     }
     return;
 }
-
-
-// Returns a string array of all arguments.
-//char **parse(char *BUFFER) {
-//    char **args = (char**)malloc((MAX_ARGS + 1) * sizeof(char*)); // up to 50 args accepted + 1 for NULL
-//    if (!args) {
-//        fputs("Failed to allocate memory for arg array", stdout);
-//        return NULL; // Error handling here?
-//    }
-//    for (int i = 0; i < MAX_ARGS + 1; ++i) { // Setting 50 args + 1 for NULL
-//        *(args + i) = (char*)malloc(MAX_ARG_LEN * sizeof(char));
-//        if (!*(args + i)) {
-//            fputs("Failed to allocate memory for individual arg", stdout);
-//            return NULL; // Error handling here?
-//        }
-//    }
-//    *(args + MAX_ARGS) = NULL;
-//    
-//    //char *tmpbuffer = (char*)malloc(strlen(BUFFER) + 1);
-//    //strcpy(tmpbuffer, BUFFER);
-//
-//    char *tmp = strtok(BUFFER, " ");
-//
-//    int counter = 0;
-//    while (tmp != NULL) {
-//        strcpy(*(args + counter), tmp);
-//        counter++;
-//        tmp = strtok(NULL, " ");
-//    }
-//
-//    return args;
-//}
-//
-//void clearparse(char **freeme) {
-//    for(int i = 0; i < MAX_ARGS + 1; ++i) {
-//        free(*(freeme + i));
-//    }
-//    free(freeme);
-//    return;
-//}
-//
-//void printstrlist(char **list) {
-//    int i = 0;
-//    while(strlen(*(list + i)) != 0) {
-//        fputs(*(list + i), stdout);
-//        fputs("\n", stdout);
-//        i++;
-//    }
-//    return;
-//}
-//
-//int args_length(char **args) {
-//    int counter = 0;
-//    while (strlen(*(args + counter)) != 0) {
-//        counter++;
-//    }
-//    return counter;
-//}
-//
-//void dir() {
-//    
-//}
