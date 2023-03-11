@@ -18,6 +18,8 @@ void whatisenviron();
 char **parse(char *buffer);
 void freeparse(char **parsed);
 void print_args(char **args);
+void external(char **args);
+int isampersand(char **args);
 
 int main(int argc, char **argv) {    
     // Constants
@@ -116,22 +118,46 @@ void understand(char *input, char *cwd) {
             } else {
                 system("ls -al");
             }
-        } else {
-            pid_t pid;
-            switch(pid = fork()) {
-            case -1:
-                printf("uh oh\n");
-            case 0:
-                execvp(*args, args);
-                printf("uh oh no\n");
-            default:
-                int status;
-                wait(&status);
-            }
+        } else { // it's an external command
+            external(args);
         }
     }
     freeparse(args);
     return;
+}
+
+void external(char **args) {
+    pid_t pid; // hold pid of the child process
+    int parallel = isampersand(args);
+    // check if parralell or not 
+    
+
+    switch(pid = fork()) {
+        case -1:
+            printf("execution failed!");
+        case 0:
+            execvp(*args, args);
+            printf("Child process %i failed to execute command: %s\n", getpid(), *args);
+            exit(0);
+        default:
+            if (!parallel) {
+                waitpid(pid, NULL, 0);
+            }
+            parallel = 0;
+    }
+}
+
+int isampersand(char **args) {
+    int i = 0;
+    while (*(args + i + 1)) {
+        i++;
+    }
+    if (strcmp(*(args + i), "&") == 0) {
+        *(args + i) = NULL;
+        free(*(args + i));
+        return 1;
+    }
+    return 0;
 }
 
 void whatisenviron() {
