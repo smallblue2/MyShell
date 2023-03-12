@@ -21,7 +21,7 @@ void whatisenviron();
 char **parse(char *buffer);
 void freeparse(char **parsed);
 void print_args(char **args);
-void external(char **args, char *mode, char *output);
+void external(char **args, char *input, char *output, char *mode);
 int isampersand(char **args);
 void errhan();
 char *inputredirection(char **args);
@@ -128,15 +128,39 @@ void understand(char *input, char *cwd) {
         } else { // it's an external command
             char *mode = (char*)malloc(3 * sizeof(char));
             char *output = outputredirection(args, mode);
-            external(args, mode, output);
+            char *input = inputredirection(args);
+            external(args, input, output, mode);
         }
     }
     freeparse(args);
     return;
 }
 
-char *inputredirection(char **args);
+char *inputredirection(char **args) {
+    
+    int i = 0;
+    while(*(args + i) != NULL) {
+        if (strcmp(*(args + i), "<")==0) {
+            break;
+        }
+        i++;
+    }
 
+    if (*(args + i) == NULL) return NULL;
+    if (strcmp(*(args + i), "<") != 0) return NULL;
+    if (*(args + i + 1) == NULL) return NULL;
+
+    char *pathname = (char*)malloc(MAX_PATH * sizeof(char));
+    strcpy(pathname, *(args + i + 1));
+    FILE *exists = fopen(pathname, "r"); // check if the file exists
+    if (exists) {
+        *(args + i) = NULL;
+        *(args + i + 1) = NULL;
+        return pathname;
+    }
+    free(pathname);
+    return NULL;
+}
 
 char *outputredirection(char **args, char *mode) {
 
@@ -179,7 +203,7 @@ char *outputredirection(char **args, char *mode) {
 }
 
 // for executing external commands
-void external(char **args, char *mode, char *output) {
+void external(char **args, char *input, char *output, char *mode) {
     pid_t pid; // hold pid of the child process
     int parallel = isampersand(args);
     // check if parralell or not 
@@ -189,6 +213,9 @@ void external(char **args, char *mode, char *output) {
         case -1:
             printf("execution failed!"); // failed to fork
         case 0:
+            if (input) {
+                freopen(input, "r", stdin);
+            }
             if (output) {
                 freopen(output, mode, stdout);
             }
@@ -203,8 +230,9 @@ void external(char **args, char *mode, char *output) {
                 waitpid(pid, NULL, 0); // NULL is for return value, don't need it
             }
     }
-    free(mode);
+    free(input);
     free(output);
+    free(mode);
 }
 
 // checks if ampersand is final character
