@@ -1,4 +1,5 @@
 #include<stdio.h>
+#include<fcntl.h>
 #include<stdlib.h>
 #include<string.h>
 #include<unistd.h>
@@ -11,15 +12,20 @@
 #define MAX_ARGS 50
 #define MAX_ARG_LEN 20
 #define MAX_PATH 260
+
 extern char **environ;
+extern int errno;
 
 void understand(char *input, char *cwd);
 void whatisenviron();
 char **parse(char *buffer);
 void freeparse(char **parsed);
 void print_args(char **args);
-void external(char **args);
+void external(char **args, char *mode, char *output);
 int isampersand(char **args);
+void errhan();
+char *inputredirection(char **args);
+char *outputredirection(char **args, char *mode);
 
 int main(int argc, char **argv) {    
     // Constants
@@ -27,10 +33,11 @@ int main(int argc, char **argv) {
     char* CWD = (char*)malloc(MAX_PATH * sizeof(char)); // setup cwd
     char *BUFFER = (char *)malloc(MAX_LENGTH * sizeof(char)); // buffer temporarily stores user's input
     if (!BUFFER) {
-        fputs("Failed to allocate buffer memory!", stdout);
+        fputs("ERROR: memory allocation failed", stderr);
+        exit(-1);
     }
     while(!feof(stdin)) { // Keep running as long as you're not at the end of file
-        getcwd(CWD, MAX_PATH);
+        if (getcwd(CWD, MAX_PATH) == NULL) {errhan();}
         fputs(CWD, stdout);
         fputs(PROMPT, stdout); // Print prompt
         fgets(BUFFER, MAX_LENGTH, stdin); // Get input
@@ -49,13 +56,13 @@ void understand(char *input, char *cwd) {
             pid_t pid;
             switch(pid = fork()) {
             case -1:
-                printf("Uh oh, something went wrong!");
+                errhan();
             case 0:
-                execlp("clear", "clear", NULL);
-                printf("Uh oh, something went wrong!");
+                if (execlp("clear", "clear", NULL)==-1) {
+                    errhan();
+                }
             default:
-                int status;
-                wait(&status);
+                waitpid(pid, NULL, 0);
             }
         } else if (strcmp(*args, "quit") == 0) {
             exit(0);
@@ -119,34 +126,88 @@ void understand(char *input, char *cwd) {
                 system("ls -al");
             }
         } else { // it's an external command
-            external(args);
+            char *mode = (char*)malloc(3 * sizeof(char));
+            char *output = outputredirection(args, mode);
+            external(args, mode, output);
         }
     }
     freeparse(args);
     return;
 }
 
-void external(char **args) {
+char *inputredirection(char **args);
+
+
+char *outputredirection(char **args, char *mode) {
+
+    //printf("Searching.\n");
+    int i = 0;
+    while(*(args + i) != NULL) {
+        if (strcmp(*(args + i), ">")==0) {
+            strcpy(mode, "w+");
+            break;
+        }
+        if (strcmp(*(args + i), ">>")==0) {
+            strcpy(mode, "a+");
+            break;
+        }
+        //fputs(*(args + i), stdout);
+        //fputs("\n", stdout);
+        i++;
+    }
+    //printf("Finished searching.\n");
+    if (*(args + i) == NULL) return NULL;
+    if (strcmp(*(args + i), ">") != 0 && strcmp(*(args + i), ">>") != 0) return NULL;
+    if (*(args + i + 1) == NULL) return NULL;
+
+    //fputs("output redirection detected.\n", stdout);
+
+    char *pathname = (char*)malloc(MAX_PATH * sizeof(char));
+    strcpy(pathname, *(args + i + 1));
+    //FILE *exists = fopen(pathname, "r"); // check if the file exists
+    //if (exists) {
+    //    *(args + i) = NULL;
+    //    *(args + i + 1) = NULL;
+    //    return pathname;
+    //}
+    *(args + i) = NULL;
+    *(args + i + 1) = NULL;
+    return pathname;
+    //fprintf(stderr, "can't find file\n");
+    free(pathname);
+    return NULL;
+}
+
+// for executing external commands
+void external(char **args, char *mode, char *output) {
     pid_t pid; // hold pid of the child process
     int parallel = isampersand(args);
     // check if parralell or not 
     
 
-    switch(pid = fork()) {
+    switch(pid = fork()) { // fork process, returns child pid
         case -1:
-            printf("execution failed!");
+            printf("execution failed!"); // failed to fork
         case 0:
-            execvp(*args, args);
-            printf("Child process %i failed to execute command: %s\n", getpid(), *args);
-            exit(0);
-        default:
-            if (!parallel) {
-                waitpid(pid, NULL, 0);
+            if (output) {
+                freopen(output, mode, stdout);
             }
-            parallel = 0;
+            if (execvp(*args, args)==-1) { // runs command and checks if failed
+                pid_t child = getpid(); // re-gets child pid
+                printf("Child process %i failed to execute command: %s\n", child, *args); // alerts failure
+                errhan();
+                kill(child, SIGTERM); // kills child process
+            }
+        default:
+            if (!parallel) { // wait for child process just created
+                waitpid(pid, NULL, 0); // NULL is for return value, don't need it
+            }
     }
+    free(mode);
+    free(output);
 }
 
+// checks if ampersand is final character
 int isampersand(char **args) {
     int i = 0;
     while (*(args + i + 1)) {
@@ -160,12 +221,13 @@ int isampersand(char **args) {
     return 0;
 }
 
+// displays environ
 void whatisenviron() {
     char **traveler = environ;
     while(*traveler) {
         char *tmp = (char*)malloc(strlen(*traveler) + 2);
         if (tmp == NULL) {
-            fputs("Failed to assign tmp in whatisenviron()", stderr);
+            fputs("Failed to assign tmp in whatisenviron()", stderr); // don't need to exit
             return;
         }
         strcpy(tmp, *traveler);
@@ -177,11 +239,12 @@ void whatisenviron() {
     return;
 }
 
+// parses input buffer
 char **parse(char *buffer) {
     char **args = (char **)malloc(MAX_ARGS * sizeof(char *));
     if (!args) {
-        printf("FAILED: memory assigned to args");
-        return NULL;
+        printf("FAILED: Memory assignment in parser");
+        exit(-1);
     }
     
     char *arg = strtok(buffer, " \n");
@@ -190,7 +253,7 @@ char **parse(char *buffer) {
         *(args + arg_count) = (char*)malloc(strlen(arg) + 1);
         if (*(args + arg_count) == NULL) {
             fprintf(stderr, "FAILED: memory assigned to args");
-            exit(1);
+            exit(-1);
         }
         strcpy(*(args + arg_count), arg);
         arg_count++;
@@ -201,6 +264,7 @@ char **parse(char *buffer) {
     return args;
 }
 
+// frees parsed buffer
 void freeparse(char **parsed) {
     int counter = 0;
     while(*(parsed + counter) != NULL) {
@@ -212,6 +276,7 @@ void freeparse(char **parsed) {
     return;
 }
 
+// displays args, mainly for debugging
 void print_args(char **args) {
     fputs("====== args ======\n", stdout);
     int counter = 0;
@@ -221,4 +286,8 @@ void print_args(char **args) {
         counter++;
     }
     return;
+}
+
+void errhan() {
+    fprintf(stderr, "ERROR: %s\n", strerror(errno));
 }

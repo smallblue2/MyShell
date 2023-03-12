@@ -9,3 +9,6 @@ for setting PWD with relative, be smart about '.' and '..', or else it'll keep a
 
 For errors:
 Better utilize errno.h, make an 'extern int errno'
+
+For relativepaths:
+make a helper function that gets relative paths of file names, or even finds if a path exists relative/absolute
